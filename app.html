@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title id="doc-title">AI Companion</title>
+    
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI Agent">
+    <meta name="theme-color" content="#000000">
+    <link rel="manifest" id="manifest-link" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" id="apple-icon" href="me.png">
+    
+    <!-- Typography & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f7f7f9;
+            --text-primary: #09090b;
+            --text-secondary: #71717a;
+            --accent-color: #0071e3;
+            --accent-glow: rgba(0, 113, 227, 0.35);
+            --gemini-grad: linear-gradient(135deg, #0071e3, #8b5cf6, #ec4899);
+            --error-color: #ef4444;
+            --success-color: #10b981;
+            --glass-bg: rgba(255, 255, 255, 0.8);
+            --glass-border: rgba(0, 0, 0, 0.08);
+            --liquid-blur: blur(24px);
+            --surface-solid: #ffffff;
+            --modal-bg: rgba(255, 255, 255, 0.98);
+        }
+
+        body.dark-mode {
+            --bg-color: #09090b;
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --accent-color: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.35);
+            --error-color: #f87171;
+            --success-color: #34d399;
+            --glass-bg: rgba(18, 18, 22, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --surface-solid: #121216;
+            --modal-bg: rgba(18, 18, 22, 0.98);
+        }
+
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            font-family: 'Inter', 'Noto Sans Devanagari', -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color); color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            overflow: hidden; height: 100vh; height: 100dvh;
+            display: flex; flex-direction: column;
+        }
+
+        .hidden { display: none !important; }
+        .scroll-hidden::-webkit-scrollbar { display: none; }
+        .scroll-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Container Layout with Dynamic Safe Area */
+        #app-container {
+            display: flex; flex-direction: column; height: 100%; width: 100%;
+            position: relative; overflow: hidden;
+        }
+
+        /* Top Header */
+        .glass-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: max(12px, env(safe-area-inset-top, 12px)) 16px 12px 16px;
+            z-index: 30; background: var(--glass-bg);
+            backdrop-filter: var(--liquid-blur); -webkit-backdrop-filter: var(--liquid-blur);
+            border-bottom: 1px solid var(--glass-border);
+            min-height: 56px; gap: 8px; flex-shrink: 0;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+        .header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+        .brand-area { 
+            display: flex; align-items: center; gap: 8px; cursor: pointer; 
+            min-width: 0; flex: 1;
+        }
+        .brand-logo-mini { 
+            width: 32px; height: 32px; border-radius: 50%; 
+            object-fit: cover; border: 1.5px solid var(--accent-color); flex-shrink: 0;
+        }
+        .brand-text { 
+            font-size: 1.05rem; font-weight: 700; white-space: nowrap; 
+            overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+        }
+
+        .icon-btn {
+            background: transparent; border: none; color: var(--text-primary);
+            width: 38px; height: 38px; border-radius: 10px;
+            display: flex; justify-content: center; align-items: center; cursor: pointer; 
+            transition: transform 0.15s, background 0.15s; flex-shrink: 0;
+        }
+        .icon-btn:active { transform: scale(0.92); }
+        .icon-btn:hover { background: var(--glass-border); }
+
+        .install-pill-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 12px; border-radius: 100px;
+            background: linear-gradient(135deg, #0071e3, #8b5cf6);
+            color: #fff; font-size: 0.78rem; font-weight: 600;
+            border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
+            transition: transform 0.2s, opacity 0.2s; white-space: nowrap;
+        }
+        .install-pill-btn:active { transform: scale(0.95); }
+
+        /* Main Chat Canvas with Optical Centering */
+        #chat-canvas { 
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            display: flex; flex-direction: column; 
+            padding: 16px 20px calc(90px + env(safe-area-inset-bottom, 24px)) 20px; 
+            position: relative; scroll-behavior: smooth;
+        }
+
+        /* Hero Centered Section */
+        #hero-section { 
+            margin: auto 0; text-align: center; width: 100%; 
+            display: flex; flex-direction: column; align-items: center;
+            padding: 20px 0; transition: opacity 0.3s ease;
+        }
+        .hero-logo-img { 
+            width: 96px; height: 96px; border-radius: 24px; 
+            margin-bottom: 16px; object-fit: cover; 
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15); 
+            border: 2px solid var(--glass-border);
+        }
+        .hero-title { font-size: 1.55rem; font-weight: 700; margin-bottom: 6px; }
+        .hero-subtitle { font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 12px; max-width: 380px; }
+        .model-badge { 
+            display: inline-flex; align-items: center; gap: 6px; 
+            font-size: 0.78rem; font-family: 'Geist Mono', monospace; 
+            background: var(--glass-border); padding: 5px 14px; 
+            border-radius: 100px; color: var(--text-secondary); 
+        }
+
+        /* Messages Container */
+        #messages-container { 
+            display: flex; flex-direction: column; gap: 32px; 
+            width: 100%; max-width: 820px; margin: 0 auto; 
+        }
+        
+        .user-msg-block { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .user-text { font-size: 1.45rem; font-weight: 600; line-height: 1.35; color: var(--text-primary); }
+        .ai-msg-block { 
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+            padding-left: 18px; border-left: 3px solid var(--accent-color); 
+        }
+        .ai-text { font-size: 1.1rem; line-height: 1.75; color: var(--text-primary); }
+        .ai-text p { margin-bottom: 14px; }
+        .ai-text code { background: var(--glass-border); padding: 3px 6px; border-radius: 6px; font-family: 'Geist Mono', monospace; font-size: 0.9em; color: var(--accent-color); }
+        
+        @keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Code Block Cards */
+        .code-card {
+            margin: 16px 0; border-radius: 12px; overflow: hidden;
+            background: #0d1117; border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+        }
+        body:not(.dark-mode) .code-card { background: #18181c; }
+        .code-card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 14px; background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .code-lang-tag { font-family: 'Geist Mono', monospace; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #a1a1aa; }
+        .code-copy-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #f4f4f5; padding: 4px 10px; border-radius: 6px;
+            font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: 0.2s;
+        }
+        .code-copy-btn:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
+        .code-copy-btn.copied { background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.5); color: #34d399; }
+        .code-card pre { margin: 0 !important; padding: 14px !important; background: transparent !important; border: none !important; overflow-x: auto; }
+        .code-card pre code { color: #f4f4f5 !important; font-family: 'Geist Mono', monospace; font-size: 0.88rem; line-height: 1.6; }
+
+        /* Rate Limit & Error Cards */
+        .rate-limit-card, .error-msg-card {
+            background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 14px; padding: 16px 18px; margin: 16px 0;
+            backdrop-filter: blur(12px); animation: slideUp 0.3s ease forwards;
+        }
+        .rate-limit-card { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.3); }
+        .error-card-header, .rate-limit-header { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.92rem; margin-bottom: 6px; color: var(--error-color); }
+        .rate-limit-header { color: #f59e0b; }
+        .error-card-text, .rate-limit-body { font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); }
+        .retry-msg-btn {
+            display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 100px;
+            background: var(--text-primary); color: var(--bg-color); font-size: 0.82rem; font-weight: 600;
+            border: none; cursor: pointer; margin-top: 10px; transition: 0.2s;
+        }
+
+        .action-bar { display: flex; gap: 16px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--glass-border); flex-wrap: wrap; }
+        .action-bar button { background: transparent; border: none; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; }
+        .action-bar button:hover { color: var(--text-primary); }
+
+        .loading-container { display: flex; align-items: center; gap: 14px; margin-top: 28px; padding-left: 18px; border-left: 3px solid var(--glass-border); }
+        .liquid-loader { display: flex; gap: 4px; }
+        .loader-bar { width: 4px; height: 16px; background: var(--accent-color); border-radius: 2px; animation: liquidBar 1s ease-in-out infinite; }
+        .loader-bar:nth-child(2) { animation-delay: 0.15s; }
+        .loader-bar:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes liquidBar { 0%, 100% { transform: scaleY(0.5); opacity: 0.5; } 50% { transform: scaleY(1.4); opacity: 1; } }
+        .loading-text { color: var(--text-secondary); font-size: 0.92rem; }
+
+        /* Floating Bottom Dock */
+        #bottom-dock { 
+            position: fixed; bottom: max(16px, env(safe-area-inset-bottom, 16px)); 
+            left: 50%; transform: translateX(-50%); 
+            width: calc(100% - 32px); max-width: 650px; z-index: 40; 
+        }
+        .glass-search-bar { 
+            display: flex; align-items: center; justify-content: space-between; 
+            background: var(--glass-bg); backdrop-filter: var(--liquid-blur); -webkit-backdrop-filter: var(--liquid-blur); 
+            border: 1px solid var(--glass-border); border-radius: 100px; padding: 10px 16px; 
+            box-shadow: 0 16px 40px rgba(0,0,0,0.12); cursor: pointer; transition: transform 0.15s; 
+        }
+        .glass-search-bar:active { transform: scale(0.98); }
+        .search-content { display: flex; align-items: center; flex: 1; pointer-events: none; min-width: 0; }
+        .search-icon { color: var(--text-secondary); margin-right: 10px; flex-shrink: 0; }
+        .placeholder-text { font-size: 0.98rem; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cursor { color: var(--text-secondary); animation: blink 1s infinite; margin-left: 2px; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .search-actions { display: flex; gap: 6px; pointer-events: auto; }
+        .action-btn { background: transparent; border: none; color: var(--text-secondary); width: 40px; height: 40px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        .action-btn:hover { background: var(--glass-border); color: var(--text-primary); }
+
+        /* Modals & Backdrop Hierarchy */
+        .modal-backdrop { 
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); 
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); 
+            display: flex; justify-content: center; 
+            transition: opacity 0.25s ease; 
+        }
+        
+        #sidebar-backdrop { z-index: 90; }
+        #input-popup-backdrop { z-index: 110; align-items: flex-end; }
+        #settings-modal-backdrop { z-index: 120; align-items: center; }
+        #ios-modal-backdrop { z-index: 130; align-items: center; }
+
+        /* Sidebar - Z-INDEX 100 (ABOVE BACKDROP 90) */
+        .liquid-sidebar { 
+            position: fixed; top: 0; left: -100%; width: 85vw; max-width: 340px; height: 100%; 
+            background: var(--surface-solid); z-index: 100; 
+            transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
+            border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; 
+            box-shadow: 10px 0 40px rgba(0, 0, 0, 0.3);
+        }
+        .liquid-sidebar.active { left: 0; }
+        .sidebar-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: max(16px, env(safe-area-inset-top, 16px)) 18px 16px 18px; 
+            border-bottom: 1px solid var(--glass-border); 
+        }
+        .sidebar-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.95rem; }
+        #history-list { flex: 1; overflow-y: auto; padding: 12px; }
+        .history-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 14px; border-radius: 10px; cursor: pointer; color: var(--text-secondary); 
+            transition: 0.15s; margin-bottom: 4px; 
+        }
+        .history-item:hover { background: var(--glass-border); color: var(--text-primary); }
+        .hist-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
+
+        /* Input Sheet (Bottom Popup) */
+        .apple-sheet { 
+            width: 100%; max-width: 780px; background: var(--modal-bg); 
+            border-radius: 28px 28px 0 0; display: flex; flex-direction: column; 
+            min-height: 48vh; max-height: 85dvh; transform: translateY(100%); 
+            transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1); 
+            box-shadow: 0 -20px 50px rgba(0,0,0,0.25); 
+        }
+        #input-popup-backdrop:not(.hidden) .apple-sheet { transform: translateY(0); }
+        .sheet-header { padding: 14px 20px; display: flex; flex-direction: column; align-items: center; border-bottom: 1px solid var(--glass-border); }
+        .drag-handle { width: 36px; height: 4px; background: var(--text-secondary); border-radius: 4px; opacity: 0.3; margin-bottom: 12px; }
+        .sheet-controls { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+        .mode-badge {
+            display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px;
+            background: transparent; border: 1px solid var(--glass-border);
+            color: var(--text-primary); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+        }
+        .mode-badge.active-search { color: var(--success-color); border-color: rgba(16, 185, 129, 0.4); }
+        
+        .sheet-body { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        .preview-container { position: relative; align-self: flex-start; margin-bottom: 14px; border-radius: 10px; border: 1px solid var(--glass-border); padding: 4px; background: var(--surface-solid); }
+        .preview-container img { max-height: 100px; max-width: 180px; border-radius: 8px; object-fit: cover; display: block; }
+        .remove-btn { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: var(--error-color); color: #fff; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        #main-textarea { width: 100%; flex: 1; min-height: 100px; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 1.15rem; line-height: 1.5; resize: none; }
+        
+        .sheet-footer { padding: 12px 20px max(24px, env(safe-area-inset-bottom, 24px)) 20px; display: flex; justify-content: space-between; align-items: center; }
+        .footer-left-actions { display: flex; align-items: center; gap: 10px; }
+        .icon-btn-solid { background: transparent; border: none; color: var(--text-secondary); width: 40px; height: 40px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        .icon-btn-solid.active-attachment { color: var(--accent-color); }
+        .char-count-text { font-size: 0.82rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+        .send-btn { background: var(--text-primary); color: var(--bg-color); border: none; width: 44px; height: 44px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+
+        /* Settings Card Modal - Apple Glassmorphism Redesign */
+        .glass-dialog { width: 92%; max-width: 480px; background: var(--modal-bg); border-radius: 26px; padding: 22px; border: 1px solid var(--glass-border); box-shadow: 0 30px 80px rgba(0,0,0,0.45); max-height: 90vh; overflow-y: auto; }
+        .dialog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .dialog-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0; display: flex; align-items: center; gap: 8px; color: var(--text-primary); }
+        .icon-btn-sm { background: rgba(125,125,125,0.1); border: 1px solid var(--glass-border); color: var(--text-secondary); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+        .icon-btn-sm:hover { color: var(--text-primary); background: var(--glass-border); }
+        .modal-segmented-control { display: flex; background: rgba(125,125,125,0.12); border-radius: 14px; padding: 4px; margin-bottom: 18px; gap: 4px; }
+        .modal-tab-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 8px; font-size: 0.85rem; font-weight: 600; border-radius: 11px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; transition: 0.2s; }
+        .modal-tab-btn.active { background: var(--surface-solid); color: var(--text-primary); box-shadow: 0 3px 12px rgba(0,0,0,0.15); }
+        .modal-tab-pane { display: none; }
+        .modal-tab-pane.active { display: block; animation: modalFadeIn 0.2s ease; }
+        @keyframes modalFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .dialog-input-group { margin-bottom: 14px; text-align: left; }
+        .dialog-label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
+        .dialog-input { width: 100%; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--surface-solid); color: var(--text-primary); font-size: 0.95rem; outline: none; }
+        .dialog-input:focus { border-color: var(--accent-color); }
+        .input-with-action { position: relative; display: flex; align-items: center; }
+        .input-with-action .dialog-input { padding-right: 44px; }
+        .input-action-icon { position: absolute; right: 12px; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; }
+        .input-action-icon:hover { color: var(--text-primary); }
+        .key-verify-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 0.78rem; flex-wrap: wrap; gap: 8px; }
+        .btn-verify-key { background: rgba(125,125,125,0.12); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 5px 12px; border-radius: 100px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; }
+        .btn-verify-key:hover { background: var(--glass-border); }
+        .api-test-badge { margin-top: 8px; padding: 6px 12px; border-radius: 10px; font-size: 0.8rem; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+        .api-test-badge.success { background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); }
+        .api-test-badge.error { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); }
+        .prompt-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 100px; font-size: 0.74rem; font-weight: 600; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); }
+        .prompt-badge.custom { background: rgba(0, 113, 227, 0.12); color: #0071e3; border-color: rgba(0, 113, 227, 0.25); }
+        .dialog-textarea { width: 100%; min-height: 130px; max-height: 220px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--glass-border); background: var(--surface-solid); color: var(--text-primary); font-size: 0.92rem; line-height: 1.5; outline: none; resize: vertical; font-family: inherit; }
+        .dialog-textarea:focus { border-color: var(--accent-color); }
+        .prompt-footer-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+        .btn-reset-prompt { background: transparent; border: 1px dashed var(--glass-border); color: var(--text-secondary); padding: 5px 12px; border-radius: 100px; font-size: 0.78rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; }
+        .btn-reset-prompt:hover { color: var(--text-primary); border-color: var(--text-primary); }
+        .dialog-btn-row { display: flex; gap: 10px; margin-top: 18px; }
+        .btn-primary { flex: 1; padding: 12px; border-radius: 12px; background: var(--text-primary); color: var(--bg-color); border: none; font-weight: 600; font-size: 0.92rem; cursor: pointer; transition: 0.2s; }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-secondary { padding: 12px 18px; border-radius: 12px; background: transparent; border: 1px solid var(--glass-border); color: var(--text-primary); font-weight: 500; font-size: 0.92rem; cursor: pointer; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .rotating { animation: spin 1s linear infinite; }
+
+        /* Toasts */
+        .toast-container { position: fixed; top: max(20px, env(safe-area-inset-top, 20px)); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 200; pointer-events: none; width: 90%; max-width: 400px; align-items: center; }
+        .premium-toast { background: var(--text-primary); color: var(--bg-color); padding: 10px 20px; border-radius: 100px; font-size: 0.88rem; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); animation: toastSlideDown 0.3s ease forwards; }
+        @keyframes toastSlideDown { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+        .toast-fade-out { animation: toastFadeUp 0.3s ease forwards; }
+        @keyframes toastFadeUp { to { opacity: 0; transform: translateY(-10px); } }
+
+        /* iOS Step Guide */
+        .ios-step { display: flex; align-items: center; gap: 12px; text-align: left; margin: 14px 0; font-size: 0.9rem; }
+        .ios-step i { color: var(--accent-color); flex-shrink: 0; }
+
+        @media (max-width: 480px) {
+            .brand-text { max-width: 120px; font-size: 0.95rem; }
+            .user-text { font-size: 1.3rem; }
+            .ai-text { font-size: 1.02rem; }
+            .hero-logo-img { width: 80px; height: 80px; border-radius: 20px; }
+            #chat-canvas { padding: 12px 16px calc(80px + env(safe-area-inset-bottom, 20px)) 16px; }
+        }
+    </style>
+</head>
+<body class="light-mode">
+
+    <div id="app-container">
+        <!-- Top Navigation -->
+        <header id="top-header" class="glass-header">
+            <div class="header-left">
+                <button id="history-toggle" class="icon-btn" title="Chat History"><i data-lucide="align-left" size="20"></i></button>
+                <div id="home-logo" class="brand-area" title="Reset View">
+                    <img id="brand-logo-img" src="me.png" alt="Bot Logo" class="brand-logo-mini">
+                    <span id="brand-name-text" class="brand-text">AI Companion</span>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <!-- PWA Install Button (Auto-hides if already running in Home Screen mode) -->
+                <button id="install-pwa-btn" class="install-pill-btn" title="Add to Phone Home Screen">
+                    <i data-lucide="download" size="13"></i> Install
+                </button>
+                <button id="settings-toggle" class="icon-btn" title="API Key & Bot Settings"><i data-lucide="sliders-horizontal" size="18"></i></button>
+                <button id="theme-toggle" class="icon-btn" title="Toggle Theme"><i data-lucide="moon" size="18"></i></button>
+            </div>
+        </header>
+
+        <!-- Main Canvas -->
+        <main id="chat-canvas" class="scroll-hidden">
+            <div id="hero-section">
+                <img id="hero-logo" src="me.png" alt="Bot Avatar" class="hero-logo-img">
+                <h1 id="hero-title" class="hero-title">AI Companion</h1>
+                <p id="hero-sub" class="hero-subtitle">Your Intelligent Companion</p>
+                <div class="model-badge">
+                    <i data-lucide="sparkles" size="12"></i>
+                    <span id="hero-model-name">bharat-patel-3.5fl</span>
+                </div>
+            </div>
+            
+            <div id="messages-container" class="hidden"></div>
+            
+            <div id="loading-indicator" class="loading-container hidden">
+                <div class="liquid-loader">
+                    <div class="loader-bar"></div>
+                    <div class="loader-bar"></div>
+                    <div class="loader-bar"></div>
+                </div>
+                <span class="loading-text" id="loading-status-text">AI is thinking...</span>
+            </div>
+        </main>
+
+        <!-- Bottom Search Bar Trigger -->
+        <footer id="bottom-dock">
+            <div id="search-bar-trigger" class="glass-search-bar">
+                <div class="search-content">
+                    <i data-lucide="search" size="18" class="search-icon"></i>
+                    <div class="placeholder-text"><span id="typewriter-text">Ask anything...</span><span class="cursor">|</span></div>
+                </div>
+                <div class="search-actions">
+                    <button id="dock-mic-btn" class="action-btn" title="Voice Input"><i data-lucide="mic" size="18"></i></button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Sidebar Backdrop & History (Z-INDEX SAFE) -->
+    <div id="sidebar-backdrop" class="modal-backdrop hidden"></div>
+    <aside id="sidebar" class="liquid-sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title"><i data-lucide="history" size="18"></i> HISTORY</span>
+            <button id="close-sidebar" class="icon-btn"><i data-lucide="x" size="18"></i></button>
+        </div>
+        <div id="history-list" class="scroll-hidden"></div>
+    </aside>
+
+    <!-- Input Popup Sheet -->
+    <div id="input-popup-backdrop" class="modal-backdrop hidden">
+        <div id="input-popup-sheet" class="apple-sheet">
+            <div class="sheet-header">
+                <div class="drag-handle"></div>
+                <div class="sheet-controls">
+                    <button id="web-search-toggle" class="mode-badge" title="Live Web Search">
+                        <i data-lucide="globe" size="14"></i> <span id="web-search-label">Web Search: Off</span>
+                    </button>
+                    <button id="close-popup-btn" class="icon-btn"><i data-lucide="x" size="18"></i></button>
+                </div>
+            </div>
+            
+            <div class="sheet-body">
+                <div id="image-preview-container" class="preview-container hidden">
+                    <img id="image-preview" src="" alt="Selected Image">
+                    <button id="remove-image-btn" class="remove-btn"><i data-lucide="x" size="13"></i></button>
+                </div>
+                <textarea id="main-textarea" class="scroll-hidden" placeholder="Ask anything..."></textarea>
+            </div>
+            
+            <div class="sheet-footer">
+                <div class="footer-left-actions">
+                    <!-- Universally Working Native Label Trigger for Camera/Photo Picker -->
+                    <input type="file" id="image-upload-input" accept="image/*" style="position:absolute; left:-9999px; opacity:0; pointer-events:none;">
+                    <label for="image-upload-input" id="popup-attach-btn" class="icon-btn-solid" title="Attach Image">
+                        <i data-lucide="paperclip" size="20"></i>
+                    </label>
+                    <button id="popup-mic-btn" class="icon-btn-solid" title="Voice Input"><i data-lucide="mic" size="20"></i></button>
+                    <span id="char-counter" class="char-count-text">0/4000</span>
+                </div>
+                <button id="send-btn" class="send-btn"><i data-lucide="arrow-up" size="20"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings & API Key Modal -->
+    <div id="settings-modal-backdrop" class="modal-backdrop hidden">
+        <div class="glass-dialog">
+            <div class="dialog-header">
+                <div class="dialog-title"><i data-lucide="sliders-horizontal" size="20"></i> Bot Preferences</div>
+                <button type="button" id="cancel-settings-btn" class="icon-btn-sm" title="Close"><i data-lucide="x" size="18"></i></button>
+            </div>
+
+            <!-- Segmented Control Tabs -->
+            <div class="modal-segmented-control">
+                <button type="button" class="modal-tab-btn active" data-tab="pane-engine">
+                    <i data-lucide="zap" size="15"></i> Engine & Key
+                </button>
+                <button type="button" class="modal-tab-btn" data-tab="pane-soul">
+                    <i data-lucide="brain-circuit" size="15"></i> AI Soul (Prompt)
+                </button>
+            </div>
+
+            <!-- Tab 1: Engine & API Key -->
+            <div id="pane-engine" class="modal-tab-pane active">
+                <div class="dialog-input-group">
+                    <label class="dialog-label">Gemini API Key</label>
+                    <div class="input-with-action">
+                        <input type="password" id="input-modal-api" class="dialog-input" placeholder="Paste AI Studio API key (AIzaSy...)...">
+                        <button type="button" id="toggle-key-visibility" class="input-action-icon" title="Toggle visibility">
+                            <i data-lucide="eye" size="18"></i>
+                        </button>
+                    </div>
+                    <div class="key-verify-row">
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent-color); text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                            <span>Get free key</span> <i data-lucide="external-link" size="12"></i>
+                        </a>
+                        <button type="button" id="btn-verify-key" class="btn-verify-key">
+                            <i data-lucide="check-circle" size="13"></i> Test Key
+                        </button>
+                    </div>
+                    <div id="api-test-result" class="api-test-badge hidden"></div>
+                </div>
+
+                <div class="dialog-input-group">
+                    <label class="dialog-label">AI Engine Model</label>
+                    <select id="select-modal-model" class="dialog-input">
+                        <option value="bharat-patel-3.5fl">bharat-patel-3.5fl (Default & Auto)</option>
+                        <option value="bharat-patel-3.1fl">bharat-patel-3.1fl</option>
+                        <option value="bharat-patel-3.8f">bharat-patel-3.8f</option>
+                        <option value="custom">Custom Model ⚙️</option>
+                    </select>
+                </div>
+
+                <div id="modal-custom-model-group" class="dialog-input-group hidden">
+                    <label class="dialog-label">Custom Model ID</label>
+                    <input type="text" id="input-modal-custom-model" class="dialog-input" placeholder="Enter custom model ID (e.g. gemini-3.5-flash)...">
+                    <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">Custom model will be sent directly to the API without modifications.</p>
+                </div>
+            </div>
+
+            <!-- Tab 2: System Prompt & Personality -->
+            <div id="pane-soul" class="modal-tab-pane">
+                <div class="dialog-input-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label class="dialog-label" style="margin-bottom:0;">System Prompt / Personality</label>
+                        <span id="prompt-status-badge" class="prompt-badge">Default</span>
+                    </div>
+                    <textarea id="modal-prompt-input" class="dialog-textarea" placeholder="Define how your AI agent behaves, speaks, and responds..."></textarea>
+                    <div class="prompt-footer-row">
+                        <button type="button" id="reset-prompt-btn" class="btn-reset-prompt" title="Revert to original prompt set by creator">
+                            <i data-lucide="rotate-ccw" size="13"></i> Reset to Original
+                        </button>
+                        <span id="prompt-char-count" class="char-count-text">0/4000</span>
+                    </div>
+                    <p style="font-size:0.76rem; color:var(--text-secondary); margin-top:8px;">
+                        The original prompt configured during bot creation is safely saved and will never be deleted. You can experiment freely and revert anytime!
+                    </p>
+                </div>
+            </div>
+
+            <div class="dialog-btn-row">
+                <button type="button" id="save-settings-btn" class="btn-primary">Save & Apply Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- iOS Install Guide Modal -->
+    <div id="ios-modal-backdrop" class="modal-backdrop hidden">
+        <div class="glass-dialog" style="text-align: center;">
+            <div style="font-size: 2.2rem; margin-bottom: 6px;">📲</div>
+            <div class="dialog-title" style="justify-content: center;">Add to iPhone Home Screen</div>
+            <p class="dialog-desc">Install this bot as a native app on your phone:</p>
+            
+            <div class="ios-step">
+                <i data-lucide="share" size="22"></i>
+                <span><strong>1.</strong> Tap <strong>Share</strong> (box with up arrow) in Safari.</span>
+            </div>
+            <div class="ios-step">
+                <i data-lucide="plus-square" size="22"></i>
+                <span><strong>2.</strong> Scroll down and select <strong>"Add to Home Screen"</strong>.</span>
+            </div>
+            <div class="ios-step">
+                <i data-lucide="check" size="22"></i>
+                <span><strong>3.</strong> Tap <strong>"Add"</strong> in top-right corner. Done!</span>
+            </div>
+            
+            <button id="close-ios-modal" class="btn-primary" style="margin-top: 14px; width: 100%;">Got it!</button>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+        // ==========================================
+        // 1. DYNAMIC BOT CONFIGURATION & RESTORATION
+        // ==========================================
+        const MODEL_API_MAP = {
+            "bharat-patel-3.5fl": "gemini-3.5-flash-lite",
+            "bharat-patel-3.1fl": "gemini-3.1-flash-lite",
+            "bharat-patel-3.8f": "gemini-3.8-flash"
+        };
+
+        function getActualApiModel(modelId) {
+            if (!modelId) return "gemini-3.5-flash-lite";
+            // Map branded names to Gemini API models
+            if (MODEL_API_MAP[modelId]) return MODEL_API_MAP[modelId];
+            // If already literal or custom model: DO NOT ALTER! Return verbatim as user specified
+            return modelId;
+        }
+
+        function getDisplayModelName(modelId) {
+            if (!modelId) return "bharat-patel-3.5fl";
+            for (const [branded, actual] of Object.entries(MODEL_API_MAP)) {
+                if (modelId === actual || modelId === branded) return branded;
+            }
+            // Custom model: display exactly what user typed
+            return modelId;
+        }
+
+        let botConfig = {
+            botId: "bot_" + Math.random().toString(36).substring(2, 9),
+            brandName: "AI Companion",
+            subtitle: "Your Intelligent Companion",
+            loadingText: "AI is thinking...",
+            apiKey: "",
+            model: "bharat-patel-3.5fl",
+            prompt: "You are a helpful and intelligent AI companion.",
+            originalPrompt: "You are a helpful and intelligent AI companion.",
+            typewriterText: "Ask anything...",
+            logoData: "me.png"
+        };
+
+        // Step A: Parse URL Query Parameters & Hash (Highest Priority for Home Screen / PWA launches)
+        try {
+            const qParams = new URLSearchParams(window.location.search);
+            const hash = window.location.hash.startsWith('#') ? new URLSearchParams(window.location.hash.substring(1)) : null;
+
+            const qId = qParams.get("id") || (hash && hash.get("id"));
+            if (qId) botConfig.botId = qId;
+
+            const qKey = qParams.get("k") || (hash && hash.get("k"));
+            if (qKey) botConfig.apiKey = qKey;
+
+            const qName = qParams.get("n") || (hash && hash.get("n"));
+            if (qName) botConfig.brandName = decodeURIComponent(qName);
+
+            const qSub = qParams.get("sub") || (hash && hash.get("sub"));
+            if (qSub) botConfig.subtitle = decodeURIComponent(qSub);
+
+            const qPrompt = qParams.get("p") || (hash && hash.get("p"));
+            if (qPrompt) {
+                const decPrompt = decodeURIComponent(qPrompt);
+                botConfig.prompt = decPrompt;
+                botConfig.originalPrompt = decPrompt; // Master locked backup from creator
+            }
+
+            const qModel = qParams.get("m") || (hash && hash.get("m"));
+            if (qModel) {
+                const decModel = decodeURIComponent(qModel);
+                if (!decModel.includes('2.5') && !decModel.includes('2.0') && !decModel.includes('1.5')) {
+                    botConfig.model = decModel;
+                }
+            }
+        } catch(e) {}
+
+        // Step B: Load from localStorage (Scoped by botId, with active config fallback)
+        try {
+            let savedBot = null;
+            if (botConfig.botId) {
+                const botSpecific = localStorage.getItem('bot_config_' + botConfig.botId);
+                if (botSpecific) savedBot = JSON.parse(botSpecific);
+            }
+            if (!savedBot) {
+                const active = localStorage.getItem('user_active_bot_config');
+                if (active) savedBot = JSON.parse(active);
+            }
+            if (savedBot) {
+                // Preserve URL-derived originalPrompt if already set from creator link
+                const masterOriginal = botConfig.originalPrompt || savedBot.originalPrompt || savedBot.prompt;
+                botConfig = { ...botConfig, ...savedBot, originalPrompt: masterOriginal };
+            }
+        } catch(e) {}
+
+        // Step C: Auto-fill API key from builder draft or legacy storage if missing
+        try {
+            if (!botConfig.apiKey) {
+                const draftSaved = localStorage.getItem('ai_architect_draft_v2');
+                if (draftSaved) {
+                    const draft = JSON.parse(draftSaved);
+                    if (draft.apiKey) botConfig.apiKey = draft.apiKey;
+                    if (draft.model && !draft.model.includes('2.5') && !draft.model.includes('2.0') && !draft.model.includes('1.5')) {
+                        botConfig.model = (draft.model === 'custom' && draft.customModel) ? draft.customModel : draft.model;
+                    }
+                    if (draft.name && botConfig.brandName === "AI Companion") botConfig.brandName = draft.name;
+                    if (draft.tagline && botConfig.subtitle === "Your Intelligent Companion") botConfig.subtitle = draft.tagline;
+                    if (draft.prompt && (!botConfig.prompt || botConfig.prompt === "You are a helpful and intelligent AI companion.")) {
+                        botConfig.prompt = draft.prompt;
+                        botConfig.originalPrompt = draft.prompt;
+                    }
+                }
+            }
+            if (!botConfig.apiKey) {
+                const storedKey = localStorage.getItem('gemini_api_key') || sessionStorage.getItem('gemini_api_key');
+                if (storedKey) botConfig.apiKey = storedKey;
+            }
+        } catch(e) {}
+
+        // Step D: Filter out obsolete models & guarantee modern default
+        if (!botConfig.model || botConfig.model.includes('2.5') || botConfig.model.includes('2.0') || botConfig.model.includes('1.5')) {
+            botConfig.model = "bharat-patel-3.5fl";
+        }
+        if (!botConfig.originalPrompt) {
+            botConfig.originalPrompt = botConfig.prompt || "You are a helpful and intelligent AI companion.";
+        }
+
+        // Step E: Persist auto-filled keys so standalone Home Screen requires NO setup
+        try {
+            if (botConfig.botId) {
+                localStorage.setItem('bot_config_' + botConfig.botId, JSON.stringify(botConfig));
+            }
+            localStorage.setItem('user_active_bot_config', JSON.stringify(botConfig));
+            if (botConfig.apiKey) localStorage.setItem('gemini_api_key', botConfig.apiKey);
+        } catch(e) {}
+
+        function applyBotToDOM() {
+            document.getElementById('doc-title').innerText = botConfig.brandName;
+            document.getElementById('brand-name-text').innerText = botConfig.brandName;
+            document.getElementById('hero-title').innerText = botConfig.brandName;
+            document.getElementById('hero-sub').innerText = botConfig.subtitle;
+            document.getElementById('loading-status-text').innerText = botConfig.loadingText;
+            document.getElementById('hero-model-name').innerText = getDisplayModelName(botConfig.model);
+            document.getElementById('typewriter-text').innerText = botConfig.typewriterText || "Ask anything...";
+            
+            let logoSrc = botConfig.logoData || "me.png";
+            if (logoSrc && !logoSrc.startsWith('data:') && !logoSrc.startsWith('http') && logoSrc !== 'me.png') {
+                logoSrc = 'data:image/png;base64,' + logoSrc;
+            }
+            document.getElementById('brand-logo-img').src = logoSrc;
+            document.getElementById('hero-logo').src = logoSrc;
+            document.getElementById('apple-icon').href = logoSrc;
+
+            // Auto-fill API Key into settings dialog
+            document.getElementById('input-modal-api').value = botConfig.apiKey || "";
+
+            // Sync Model selector & Custom model input
+            const selectModel = document.getElementById('select-modal-model');
+            const customGroup = document.getElementById('modal-custom-model-group');
+            const customInput = document.getElementById('input-modal-custom-model');
+
+            if (botConfig.model === 'bharat-patel-3.5fl' || botConfig.model === 'gemini-3.5-flash-lite') {
+                selectModel.value = 'bharat-patel-3.5fl';
+                if (customGroup) customGroup.classList.add('hidden');
+            } else if (botConfig.model === 'bharat-patel-3.1fl' || botConfig.model === 'gemini-3.1-flash-lite') {
+                selectModel.value = 'bharat-patel-3.1fl';
+                if (customGroup) customGroup.classList.add('hidden');
+            } else if (botConfig.model === 'bharat-patel-3.8f' || botConfig.model === 'gemini-3.8-flash') {
+                selectModel.value = 'bharat-patel-3.8f';
+                if (customGroup) customGroup.classList.add('hidden');
+            } else if (botConfig.model) {
+                selectModel.value = 'custom';
+                if (customGroup) customGroup.classList.remove('hidden');
+                if (customInput) customInput.value = botConfig.model;
+            } else {
+                selectModel.value = 'bharat-patel-3.5fl';
+                if (customGroup) customGroup.classList.add('hidden');
+            }
+
+            // Sync System Prompt in Modal
+            const promptInput = document.getElementById('modal-prompt-input');
+            const promptBadge = document.getElementById('prompt-status-badge');
+            const promptCharCount = document.getElementById('prompt-char-count');
+            if (promptInput) {
+                promptInput.value = botConfig.prompt || "";
+                if (promptCharCount) promptCharCount.innerText = `${promptInput.value.length}/4000`;
+                if (promptBadge) {
+                    const isCustom = botConfig.originalPrompt && (botConfig.prompt !== botConfig.originalPrompt);
+                    promptBadge.innerText = isCustom ? "Customized" : "Default";
+                    promptBadge.className = isCustom ? "prompt-badge custom" : "prompt-badge";
+                }
+            }
+
+            // Bind dynamic manifest with custom query params so PWA install locks in this exact bot
+            try {
+                const manifestLink = document.getElementById('manifest-link');
+                if (manifestLink && botConfig.apiKey) {
+                    const dynManifest = {
+                        name: botConfig.brandName || "AI Companion",
+                        short_name: (botConfig.brandName || "AI").substring(0, 15),
+                        description: botConfig.subtitle || "Your custom intelligent AI agent",
+                        start_url: `app.html?id=${encodeURIComponent(botConfig.botId || 'default')}&k=${encodeURIComponent(botConfig.apiKey)}&n=${encodeURIComponent(botConfig.brandName || 'AI')}&m=${encodeURIComponent(botConfig.model || 'bharat-patel-3.5fl')}&p=${encodeURIComponent(botConfig.prompt || '')}&sub=${encodeURIComponent(botConfig.subtitle || '')}`,
+                        scope: "./",
+                        display: "standalone",
+                        orientation: "portrait",
+                        background_color: "#000000",
+                        theme_color: "#000000",
+                        icons: [
+                            { src: "me.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+                            { src: "me.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+                        ]
+                    };
+                    const mBlob = new Blob([JSON.stringify(dynManifest)], { type: 'application/manifest+json' });
+                    manifestLink.href = URL.createObjectURL(mBlob);
+                }
+            } catch(e) {}
+        }
+        applyBotToDOM();
+
+        // ==========================================
+        // 2. SMART PWA / HOME SCREEN DETECTION (RULE 7)
+        // ==========================================
+        function isRunningStandalone() {
+            return (window.matchMedia('(display-mode: standalone)').matches) || 
+                   (window.navigator.standalone === true) || 
+                   (document.referrer.includes('android-app://'));
+        }
+
+        const installBtn = document.getElementById('install-pwa-btn');
+        // Rule 7: If already installed or opened from Home Screen, HIDE the install button!
+        if (isRunningStandalone()) {
+            installBtn.style.display = 'none';
+        }
+
+        let deferredInstallPrompt = null;
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js?v=2').then((reg) => {
+                reg.update().catch(() => {});
+            }).catch(() => {});
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            if (!isRunningStandalone()) {
+                installBtn.style.display = 'inline-flex';
+            }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            installBtn.style.display = 'none';
+            deferredInstallPrompt = null;
+            showToast("🎉 App added to Home Screen successfully!", "check-circle");
+        });
+
+        installBtn.addEventListener('click', async () => {
+            const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            if (isIos) {
+                document.getElementById('ios-modal-backdrop').classList.remove('hidden');
+                lucide.createIcons();
+                return;
+            }
+
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                const { outcome } = await deferredInstallPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installBtn.style.display = 'none';
+                    showToast("Installing app...", "download");
+                }
+                deferredInstallPrompt = null;
+            } else {
+                showToast("Tap menu (⋮) -> 'Add to Home screen'", "info");
+            }
+        });
+
+        document.getElementById('close-ios-modal').addEventListener('click', () => {
+            document.getElementById('ios-modal-backdrop').classList.add('hidden');
+        });
+
+        // ==========================================
+        // 3. SETTINGS & API KEY DIALOG (APPLE GLASSMORPHISM)
+        // ==========================================
+        const settingsBackdrop = document.getElementById('settings-modal-backdrop');
+        document.getElementById('settings-toggle').addEventListener('click', () => {
+            applyBotToDOM();
+            settingsBackdrop.classList.remove('hidden');
+            lucide.createIcons();
+        });
+        document.getElementById('cancel-settings-btn').addEventListener('click', () => {
+            settingsBackdrop.classList.add('hidden');
+        });
+        settingsBackdrop.addEventListener('click', (e) => {
+            if (e.target === settingsBackdrop) settingsBackdrop.classList.add('hidden');
+        });
+
+        // Tab Switching
+        document.querySelectorAll('.modal-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.modal-tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.modal-tab-pane').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                const targetPane = document.getElementById(btn.getAttribute('data-tab'));
+                if (targetPane) targetPane.classList.add('active');
+                lucide.createIcons();
+            });
+        });
+
+        // Password Eye Toggle
+        const toggleKeyBtn = document.getElementById('toggle-key-visibility');
+        const apiInput = document.getElementById('input-modal-api');
+        if (toggleKeyBtn && apiInput) {
+            toggleKeyBtn.addEventListener('click', () => {
+                const isPass = apiInput.type === 'password';
+                apiInput.type = isPass ? 'text' : 'password';
+                toggleKeyBtn.innerHTML = isPass ? `<i data-lucide="eye-off" size="18"></i>` : `<i data-lucide="eye" size="18"></i>`;
+                lucide.createIcons();
+            });
+        }
+
+        // 1-Click API Key Verifier
+        const testBtn = document.getElementById('btn-verify-key');
+        const resultBadge = document.getElementById('api-test-result');
+        if (testBtn && resultBadge) {
+            testBtn.addEventListener('click', async () => {
+                const testKey = apiInput.value.trim();
+                if (!testKey) {
+                    showToast("Please enter an API key to test", "alert-circle");
+                    return;
+                }
+                resultBadge.classList.remove('hidden', 'success', 'error');
+                resultBadge.innerHTML = `<i data-lucide="loader" class="rotating" size="14"></i> Testing key with Google AI...`;
+                lucide.createIcons();
+                try {
+                    const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${testKey}`);
+                    if (testRes.ok) {
+                        resultBadge.className = "api-test-badge success";
+                        resultBadge.innerHTML = `<i data-lucide="check-circle" size="14"></i> Key is valid & active!`;
+                    } else {
+                        const errData = await testRes.json().catch(() => ({}));
+                        const msg = errData?.error?.message || "Invalid API Key";
+                        resultBadge.className = "api-test-badge error";
+                        resultBadge.innerHTML = `<i data-lucide="alert-triangle" size="14"></i> ${msg}`;
+                    }
+                } catch(err) {
+                    resultBadge.className = "api-test-badge error";
+                    resultBadge.innerHTML = `<i data-lucide="wifi-off" size="14"></i> Network error testing key`;
+                }
+                lucide.createIcons();
+            });
+        }
+
+        // Prompt Input Counter & Badge
+        const modalPromptInput = document.getElementById('modal-prompt-input');
+        if (modalPromptInput) {
+            modalPromptInput.addEventListener('input', () => {
+                const len = modalPromptInput.value.length;
+                document.getElementById('prompt-char-count').innerText = `${len}/4000`;
+                const isCustom = botConfig.originalPrompt && (modalPromptInput.value !== botConfig.originalPrompt);
+                const badge = document.getElementById('prompt-status-badge');
+                if (badge) {
+                    badge.innerText = isCustom ? "Customized" : "Default";
+                    badge.className = isCustom ? "prompt-badge custom" : "prompt-badge";
+                }
+            });
+        }
+
+        // Reset to Original Creator Prompt (1-Click)
+        const resetPromptBtn = document.getElementById('reset-prompt-btn');
+        if (resetPromptBtn && modalPromptInput) {
+            resetPromptBtn.addEventListener('click', () => {
+                modalPromptInput.value = botConfig.originalPrompt || "You are a helpful and intelligent AI companion.";
+                document.getElementById('prompt-char-count').innerText = `${modalPromptInput.value.length}/4000`;
+                const badge = document.getElementById('prompt-status-badge');
+                if (badge) {
+                    badge.innerText = "Default";
+                    badge.className = "prompt-badge";
+                }
+                showToast("Prompt restored to original creator prompt! ↺", "check-circle");
+            });
+        }
+
+        document.getElementById('select-modal-model').addEventListener('change', (e) => {
+            const customGroup = document.getElementById('modal-custom-model-group');
+            if (e.target.value === 'custom') {
+                customGroup.classList.remove('hidden');
+                document.getElementById('input-modal-custom-model')?.focus();
+            } else {
+                customGroup.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('save-settings-btn').addEventListener('click', () => {
+            const key = document.getElementById('input-modal-api').value.trim();
+            const mod = document.getElementById('select-modal-model').value;
+            let finalModel = mod;
+            if (mod === 'custom') {
+                const customVal = document.getElementById('input-modal-custom-model')?.value.trim();
+                if (!customVal) {
+                    showToast("Please enter a custom model ID", "alert-circle");
+                    return;
+                }
+                finalModel = customVal; // User's custom model: untouched & unaltered!
+            }
+            const customPrompt = document.getElementById('modal-prompt-input')?.value.trim();
+            if (customPrompt) {
+                botConfig.prompt = customPrompt;
+            }
+
+            botConfig.apiKey = key;
+            botConfig.model = finalModel;
+
+            try {
+                if (botConfig.botId) {
+                    localStorage.setItem('bot_config_' + botConfig.botId, JSON.stringify(botConfig));
+                }
+                localStorage.setItem('user_active_bot_config', JSON.stringify(botConfig));
+                if (key) localStorage.setItem('gemini_api_key', key);
+            } catch(e) {}
+
+            applyBotToDOM();
+            settingsBackdrop.classList.add('hidden');
+            showToast("Settings saved successfully! 🚀", "check-circle");
+        });
+
+        // ==========================================
+        // 4. RATE LIMITING (15 RPM & 500 RPD)
+        // ==========================================
+        const RATE_CONFIG = { RPM_LIMIT: 15, RPD_LIMIT: 500, RPM_WINDOW_MS: 60000 };
+
+        function checkRateLimit() {
+            const now = Date.now();
+            const today = new Date().toISOString().slice(0, 10);
+            
+            let daily = JSON.parse(localStorage.getItem("app_rpd_tracker") || "null");
+            if (!daily || daily.date !== today) daily = { date: today, count: 0 };
+            if (daily.count >= RATE_CONFIG.RPD_LIMIT) {
+                renderRateLimitNotice(`🛑 **Daily Limit Reached (500 RPD):** Quota resets at 00:00 UTC.`);
+                return false;
+            }
+            
+            let rpm = JSON.parse(localStorage.getItem("app_rpm_timestamps") || "[]");
+            rpm = rpm.filter(t => (now - t) < RATE_CONFIG.RPM_WINDOW_MS);
+            if (rpm.length >= RATE_CONFIG.RPM_LIMIT) {
+                const waitSecs = Math.max(1, Math.ceil((rpm[0] + RATE_CONFIG.RPM_WINDOW_MS - now) / 1000));
+                showToast(`⏳ Speed Limit (15 RPM): Please wait ${waitSecs}s`, "clock");
+                renderRateLimitNotice(`⏳ **Speed Limit Active (15 RPM):** Please wait **${waitSecs}s** before sending next prompt.`);
+                return false;
+            }
+            return true;
+        }
+
+        function recordUsage() {
+            const now = Date.now();
+            const today = new Date().toISOString().slice(0, 10);
+            let rpm = JSON.parse(localStorage.getItem("app_rpm_timestamps") || "[]");
+            rpm = rpm.filter(t => (now - t) < RATE_CONFIG.RPM_WINDOW_MS);
+            rpm.push(now);
+            localStorage.setItem("app_rpm_timestamps", JSON.stringify(rpm));
+
+            let daily = JSON.parse(localStorage.getItem("app_rpd_tracker") || "null");
+            if (!daily || daily.date !== today) daily = { date: today, count: 0 };
+            daily.count += 1;
+            localStorage.setItem("app_rpd_tracker", JSON.stringify(daily));
+        }
+
+        function renderRateLimitNotice(md) {
+            heroSection.classList.add("hidden");
+            messagesContainer.classList.remove("hidden");
+            const div = document.createElement("div");
+            div.className = "rate-limit-card";
+            div.innerHTML = `<div class="rate-limit-header"><i data-lucide="shield-alert" size="18"></i><span>Rate Limit Active</span></div><div class="rate-limit-body">${marked.parse(md)}</div>`;
+            messagesContainer.appendChild(div);
+            lucide.createIcons();
+            chatCanvas.scrollTop = chatCanvas.scrollHeight;
+        }
+
+        function showToast(msg, icon = "info") {
+            const toast = document.createElement("div");
+            toast.className = "premium-toast";
+            toast.innerHTML = `<i data-lucide="${icon}" size="16"></i> <span>${msg}</span>`;
+            document.getElementById("toast-container").appendChild(toast);
+            lucide.createIcons();
+            setTimeout(() => {
+                toast.classList.add("toast-fade-out");
+                setTimeout(() => toast.remove(), 350);
+            }, 3000);
+        }
+
+        // ==========================================
+        // 5. 1-CLICK CODE COPY
+        // ==========================================
+        window.copyCodeBlock = function(btn) {
+            const pre = btn.closest(".code-card");
+            const code = pre ? pre.querySelector("code") : null;
+            if (!code) return;
+            navigator.clipboard.writeText(code.innerText).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = `<i data-lucide="check" size="13"></i> Copied!`;
+                btn.classList.add("copied");
+                lucide.createIcons();
+                setTimeout(() => { btn.innerHTML = orig; btn.classList.remove("copied"); lucide.createIcons(); }, 2000);
+            });
+        };
+
+        function renderMarkdownWithCode(container, text) {
+            if (!window.marked) { container.innerText = text; return; }
+            container.innerHTML = marked.parse(text);
+            container.querySelectorAll("pre").forEach(pre => {
+                if (pre.parentElement.classList.contains("code-card")) return;
+                const code = pre.querySelector("code");
+                const className = code ? code.className : "";
+                const lang = (className.match(/language-([a-zA-Z0-9_-]+)/) || [])[1] || "code";
+                const card = document.createElement("div");
+                card.className = "code-card";
+                card.innerHTML = `<div class="code-card-header"><span class="code-lang-tag">${lang}</span><button class="code-copy-btn" onclick="copyCodeBlock(this)"><i data-lucide="copy" size="13"></i> Copy</button></div>`;
+                pre.parentNode.insertBefore(card, pre);
+                card.appendChild(pre);
+            });
+            lucide.createIcons();
+        }
+
+        // ==========================================
+        // 6. CORE AI ENGINE & MODEL RESILIENCE
+        // ==========================================
+        let isGenerating = false;
+        let lastFailedText = "";
+        let chatMemory = [];
+        let isWebSearch = false;
+        let currentBase64 = null;
+        let currentMime = null;
+
+        const messagesContainer = document.getElementById("messages-container");
+        const heroSection = document.getElementById("hero-section");
+        const loadingIndicator = document.getElementById("loading-indicator");
+        const chatCanvas = document.getElementById("chat-canvas");
+        const mainTextarea = document.getElementById("main-textarea");
+        const inputPopupBackdrop = document.getElementById("input-popup-backdrop");
+
+        function getCandidateModels() {
+            const activeActual = getActualApiModel(botConfig.model || "bharat-patel-3.5fl");
+            const models = [
+                activeActual,
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+                "gemini-3.8-flash"
+            ];
+            return [...new Set(models)];
+        }
+
+        window.retryLastPrompt = function() {
+            if (lastFailedText) triggerAI(lastFailedText);
+        };
+
+        async function triggerAI(userText) {
+            if (isGenerating) return;
+            
+            // Check API Key existence: If missing, open settings directly!
+            if (!botConfig.apiKey) {
+                showToast("Please enter your Gemini API Key first!", "key-round");
+                settingsBackdrop.classList.remove('hidden');
+                document.getElementById('input-modal-api').focus();
+                return;
+            }
+
+            if (!checkRateLimit()) return;
+
+            isGenerating = true;
+            lastFailedText = userText;
+            inputPopupBackdrop.classList.add("hidden");
+            heroSection.classList.add("hidden");
+            messagesContainer.classList.remove("hidden");
+
+            const uDiv = document.createElement("div");
+            uDiv.className = "user-msg-block";
+            let imgTag = currentBase64 ? `<img src="${currentBase64}" style="max-width:200px; border-radius:12px; margin-bottom:10px; display:block;">` : "";
+            uDiv.innerHTML = `${imgTag}<div class="user-text">${userText}</div>`;
+            messagesContainer.appendChild(uDiv);
+
+            const payload = {
+                contents: [...chatMemory],
+                safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                ]
+            };
+            if (botConfig.prompt) {
+                payload.systemInstruction = { parts: [{ text: botConfig.prompt }] };
+            }
+            if (isWebSearch) payload.tools = [{ googleSearch: {} }];
+
+            const parts = [];
+            if (currentBase64) parts.push({ inlineData: { mimeType: currentMime, data: currentBase64.split(",")[1] } });
+            parts.push({ text: userText });
+            payload.contents.push({ role: "user", parts: parts });
+
+            mainTextarea.value = "";
+            document.getElementById("remove-image-btn").click();
+            loadingIndicator.classList.remove("hidden");
+            chatCanvas.scrollTop = chatCanvas.scrollHeight;
+
+            const aiDiv = document.createElement("div");
+            aiDiv.className = "ai-msg-block hidden";
+            const aiTextContainer = document.createElement("div");
+            aiTextContainer.className = "ai-text";
+            aiDiv.appendChild(aiTextContainer);
+            messagesContainer.appendChild(aiDiv);
+
+            let aiFullText = "";
+
+            try {
+                let response = null;
+                let lastErr = null;
+                const uniqueModels = getCandidateModels();
+
+                for (let model of uniqueModels) {
+                    try {
+                        const apiModelName = getActualApiModel(model);
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModelName}:streamGenerateContent?alt=sse&key=${botConfig.apiKey}`;
+                        const res = await fetch(url, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+                        if (res.ok) { response = res; break; }
+                        else {
+                            const errJson = await res.json().catch(() => ({}));
+                            lastErr = { status: res.status, data: errJson };
+                            if (res.status === 400 && errJson?.error?.message?.toLowerCase().includes("api key")) {
+                                break;
+                            }
+                            if (res.status === 503 || res.status === 429) await new Promise(r => setTimeout(r, 600));
+                        }
+                    } catch(fe) { lastErr = { status: 0, message: fe.message }; }
+                }
+
+                if (!response || !response.ok) {
+                    let errMsg = "API Connection Failed";
+                    let isQuota = false, isDemand = false;
+                    if (lastErr) {
+                        const raw = lastErr.data?.error?.message || lastErr.message || "";
+                        if (lastErr.status === 429 || raw.includes("RESOURCE_EXHAUSTED")) {
+                            isQuota = true; errMsg = "API Quota Limit (429): Quota temporarily exhausted. Please wait 1-2 minutes.";
+                        } else if (lastErr.status === 503 || raw.includes("high demand") || raw.includes("UNAVAILABLE")) {
+                            isDemand = true; errMsg = "Google Servers Busy (503): High peak demand. Tap retry below.";
+                        } else if (lastErr.status === 400 || raw.includes("API_KEY_INVALID")) {
+                            errMsg = "Invalid Gemini API Key! Please verify your key in Settings.";
+                            settingsBackdrop.classList.remove('hidden');
+                        } else if (raw) errMsg = raw;
+                    }
+
+                    aiTextContainer.innerHTML = `
+                        <div class="error-msg-card">
+                            <div class="error-card-header"><i data-lucide="${isQuota ? 'clock' : isDemand ? 'activity' : 'alert-circle'}" size="18"></i><span>${isQuota ? 'Quota Notice' : isDemand ? 'Server Busy' : 'Connection Alert'}</span></div>
+                            <p class="error-card-text">${errMsg}</p>
+                            <button class="retry-msg-btn" onclick="retryLastPrompt()"><i data-lucide="refresh-cw" size="14"></i> Tap to Retry</button>
+                        </div>
+                    `;
+                    aiDiv.classList.remove("hidden");
+                    lucide.createIcons();
+                    return;
+                }
+
+                recordUsage();
+                loadingIndicator.classList.add("hidden");
+                aiDiv.classList.remove("hidden");
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+                let renderTimer = null;
+
+                function throttledRender(isFinal = false) {
+                    if (isFinal) {
+                        clearTimeout(renderTimer);
+                        renderMarkdownWithCode(aiTextContainer, aiFullText);
+                        chatCanvas.scrollTop = chatCanvas.scrollHeight;
+                        return;
+                    }
+                    if (!renderTimer) {
+                        renderTimer = setTimeout(() => {
+                            renderTimer = null;
+                            renderMarkdownWithCode(aiTextContainer, aiFullText);
+                            chatCanvas.scrollTop = chatCanvas.scrollHeight;
+                        }, 40);
+                    }
+                }
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    let lines = buffer.split("\n");
+                    buffer = lines.pop();
+
+                    for (let line of lines) {
+                        const trimmed = line.trim();
+                        if (trimmed.startsWith("data: ")) {
+                            try {
+                                const jsonStr = trimmed.substring(6);
+                                if (jsonStr === "[DONE]") continue;
+                                const data = JSON.parse(jsonStr);
+                                const chunk = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                                if (chunk) { aiFullText += chunk; throttledRender(false); }
+                            } catch(e) {}
+                        }
+                    }
+                }
+
+                throttledRender(true);
+                if (!aiFullText) aiFullText = "I'm ready! How can I assist you?";
+                renderMarkdownWithCode(aiTextContainer, aiFullText);
+
+                chatMemory.push({ role: "user", parts: parts });
+                chatMemory.push({ role: "model", parts: [{ text: aiFullText }] });
+
+                const chatId = "chat_" + Date.now();
+                saveLocalChat(chatId, userText, aiFullText);
+
+                const actionBar = document.createElement("div");
+                actionBar.className = "action-bar";
+                actionBar.innerHTML = `
+                    <button onclick="speakText(this)"><i data-lucide="volume-2" size="14"></i> Listen</button>
+                    <button onclick="copyToClipboard(this)"><i data-lucide="copy" size="14"></i> Copy</button>
+                    <button onclick="downloadAsJPG(this)"><i data-lucide="image" size="14"></i> Save</button>
+                    <button onclick="shareLink('${chatId}')"><i data-lucide="share-2" size="14"></i> Share</button>
+                `;
+                aiDiv.appendChild(actionBar);
+                lucide.createIcons();
+
+            } catch(err) {
+                aiTextContainer.innerHTML = `
+                    <div class="error-msg-card">
+                        <div class="error-card-header"><i data-lucide="wifi-off" size="18"></i><span>Connection Error</span></div>
+                        <p class="error-card-text">${err.message}</p>
+                        <button class="retry-msg-btn" onclick="retryLastPrompt()"><i data-lucide="refresh-cw" size="14"></i> Tap to Retry</button>
+                    </div>
+                `;
+                aiDiv.classList.remove("hidden");
+                lucide.createIcons();
+            } finally {
+                loadingIndicator.classList.add("hidden");
+                isGenerating = false;
+                chatCanvas.scrollTop = chatCanvas.scrollHeight;
+            }
+        }
+
+        // ==========================================
+        // 7. UI EVENTS & ATTACHMENTS
+        // ==========================================
+        document.getElementById("search-bar-trigger").addEventListener("click", () => {
+            inputPopupBackdrop.classList.remove("hidden");
+            setTimeout(() => mainTextarea.focus(), 250);
+        });
+
+        document.getElementById("close-popup-btn").addEventListener("click", () => {
+            inputPopupBackdrop.classList.add("hidden");
+        });
+
+        inputPopupBackdrop.addEventListener("click", (e) => {
+            if (e.target === inputPopupBackdrop) inputPopupBackdrop.classList.add("hidden");
+        });
+
+        document.getElementById("send-btn").addEventListener("click", () => {
+            const val = mainTextarea.value.trim();
+            if (val || currentBase64) triggerAI(val || "Please analyze this image.");
+        });
+
+        mainTextarea.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); document.getElementById("send-btn").click(); }
+        });
+
+        mainTextarea.addEventListener("input", () => {
+            document.getElementById("char-counter").innerText = `${mainTextarea.value.length}/4000`;
+        });
+
+        // Theme Toggle
+        document.getElementById("theme-toggle").addEventListener("click", () => {
+            document.body.classList.toggle("dark-mode");
+            const isDark = document.body.classList.contains("dark-mode");
+            document.getElementById("theme-toggle").innerHTML = `<i data-lucide="${isDark ? 'sun' : 'moon'}" size="18"></i>`;
+            localStorage.setItem("app_theme", isDark ? "dark" : "light");
+            lucide.createIcons();
+        });
+        if (localStorage.getItem("app_theme") === "dark") {
+            document.body.classList.add("dark-mode");
+            document.getElementById("theme-toggle").innerHTML = `<i data-lucide="sun" size="18"></i>`;
+        }
+
+        // Web Search Toggle
+        document.getElementById("web-search-toggle").addEventListener("click", () => {
+            isWebSearch = !isWebSearch;
+            document.getElementById("web-search-toggle").classList.toggle("active-search", isWebSearch);
+            document.getElementById("web-search-label").innerText = isWebSearch ? "Web Search: On" : "Web Search: Off";
+            showToast(isWebSearch ? "Live Web Search On 🌐" : "Web Search Off 🔕");
+        });
+
+        // Image Attachment Handler (Universal Mobile Safari & Android)
+        const fileInput = document.getElementById("image-upload-input");
+        fileInput.addEventListener("change", (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (f) {
+                if (f.size > 5 * 1024 * 1024) return showToast("Image must be under 5MB", "alert-circle");
+                const reader = new FileReader();
+                reader.onload = (re) => {
+                    currentBase64 = re.target.result;
+                    currentMime = f.type;
+                    document.getElementById("image-preview").src = currentBase64;
+                    document.getElementById("image-preview-container").classList.remove("hidden");
+                    document.getElementById("popup-attach-btn").classList.add("active-attachment");
+                    showToast("Photo attached! 📸", "image");
+                };
+                reader.readAsDataURL(f);
+            }
+        });
+        document.getElementById("remove-image-btn").addEventListener("click", () => {
+            currentBase64 = null; currentMime = null; fileInput.value = "";
+            document.getElementById("image-preview-container").classList.add("hidden");
+            document.getElementById("popup-attach-btn").classList.remove("active-attachment");
+        });
+
+        // Speech Input (Mobile Fallback for iOS)
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        if (SpeechRec) {
+            try {
+                recognition = new SpeechRec();
+                recognition.lang = 'hi-IN';
+                recognition.onstart = () => { inputPopupBackdrop.classList.remove("hidden"); showToast("Listening... 🎤", "mic"); };
+                recognition.onresult = (e) => { mainTextarea.value += (mainTextarea.value ? " " : "") + e.results[0][0].transcript; };
+            } catch(e) {}
+        }
+
+        function handleMicTrigger(e) {
+            if (e) e.stopPropagation();
+            if (recognition) {
+                try { recognition.start(); return; } catch(err){}
+            }
+            // Mobile Safari fallback: Focus input and prompt native dictation
+            inputPopupBackdrop.classList.remove("hidden");
+            setTimeout(() => {
+                mainTextarea.focus();
+                showToast("Use your keyboard mic icon 🎙️", "info");
+            }, 300);
+        }
+        document.getElementById("dock-mic-btn").addEventListener("click", handleMicTrigger);
+        document.getElementById("popup-mic-btn").addEventListener("click", handleMicTrigger);
+
+        // ==========================================
+        // 8. SIDEBAR HISTORY - FIXED Z-INDEX & INTERACTIONS
+        // ==========================================
+        const sidebar = document.getElementById("sidebar");
+        const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+
+        function openSidebar() {
+            sidebarBackdrop.classList.remove("hidden");
+            sidebar.classList.add("active");
+            loadHistory();
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove("active");
+            setTimeout(() => sidebarBackdrop.classList.add("hidden"), 200);
+        }
+
+        document.getElementById("history-toggle").addEventListener("click", openSidebar);
+        document.getElementById("close-sidebar").addEventListener("click", closeSidebar);
+        sidebarBackdrop.addEventListener("click", closeSidebar);
+
+        function saveLocalChat(id, input, output) {
+            const hist = JSON.parse(localStorage.getItem("app_local_history") || "{}");
+            hist[id] = { topic_name: input.substring(0, 32) + "...", input, output, timestamp: Date.now() };
+            localStorage.setItem("app_local_history", JSON.stringify(hist));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const hist = JSON.parse(localStorage.getItem("app_local_history") || "{}");
+            const list = document.getElementById("history-list");
+            list.innerHTML = "";
+            const keys = Object.keys(hist).sort((a,b) => hist[b].timestamp - hist[a].timestamp);
+            if (keys.length === 0) {
+                list.innerHTML = `<p style="text-align:center; color:var(--text-secondary); padding:24px; font-size:0.9rem;">No chats yet</p>`;
+                return;
+            }
+            keys.forEach(k => {
+                const item = hist[k];
+                const div = document.createElement("div");
+                div.className = "history-item";
+                div.innerHTML = `<span class="hist-title">${item.topic_name}</span><i data-lucide="trash-2" size="14" style="color:var(--text-secondary);"></i>`;
+                div.querySelector(".hist-title").onclick = () => {
+                    closeSidebar();
+                    heroSection.classList.add("hidden");
+                    messagesContainer.classList.remove("hidden");
+                    messagesContainer.innerHTML = `
+                        <div class="user-msg-block"><div class="user-text">${item.input}</div></div>
+                        <div class="ai-msg-block"><div class="ai-text"></div></div>
+                    `;
+                    renderMarkdownWithCode(messagesContainer.querySelector(".ai-msg-block .ai-text"), item.output);
+                };
+                div.querySelector("i").onclick = (e) => {
+                    e.stopPropagation();
+                    delete hist[k];
+                    localStorage.setItem("app_local_history", JSON.stringify(hist));
+                    loadHistory();
+                };
+                list.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        // ==========================================
+        // 9. ACTIONS (TTS, Copy, JPG, Share)
+        // ==========================================
+        window.speakText = function(btn) {
+            if (!('speechSynthesis' in window)) return showToast("Speech not supported");
+            if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); return; }
+            const txt = btn.closest('.ai-msg-block').querySelector('.ai-text').innerText;
+            const u = new SpeechSynthesisUtterance(txt);
+            u.lang = 'hi-IN';
+            window.speechSynthesis.speak(u);
+            showToast("Playing audio 🔊");
+        };
+
+        window.copyToClipboard = async function(btn) {
+            const txt = btn.closest('.ai-msg-block').querySelector('.ai-text').innerText;
+            await navigator.clipboard.writeText(txt);
+            showToast("Copied to clipboard! 📋");
+        };
+
+        window.downloadAsJPG = async function(btn) {
+            showToast("Preparing image snapshot... 🎨");
+            const block = btn.closest('.ai-msg-block');
+            const clone = block.cloneNode(true);
+            clone.querySelector('.action-bar')?.remove();
+            clone.style.padding = "24px";
+            clone.style.background = document.body.classList.contains('dark-mode') ? "#121216" : "#ffffff";
+            document.body.appendChild(clone);
+            const cvs = await html2canvas(clone, { scale: 2 });
+            document.body.removeChild(clone);
+            const a = document.createElement("a");
+            a.download = `Chat-Snapshot-${Date.now()}.jpg`;
+            a.href = cvs.toDataURL("image/jpeg", 0.95);
+            a.click();
+            showToast("Downloaded! 📥");
+        };
+
+        window.shareLink = async function() {
+            const u = window.location.href;
+            if (navigator.share) await navigator.share({ title: botConfig.brandName, url: u });
+            else { await navigator.clipboard.writeText(u); showToast("Link copied! 🔗"); }
+        };
+
+        // Reset Home View
+        document.getElementById("home-logo").addEventListener("click", () => {
+            messagesContainer.innerHTML = "";
+            messagesContainer.classList.add("hidden");
+            heroSection.classList.remove("hidden");
+            chatMemory = [];
+        });
+
+        // Initialize Lucide Icons
+        window.onload = () => {
+            lucide.createIcons();
+            loadHistory();
+        };
+    </script>
+</body>
+</html>
